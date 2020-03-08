@@ -33,7 +33,7 @@ func (s *Server) Listen() {
 
 	listener, _ := net.ListenTCP("tcp", s.addr)
 	defer listener.Close()
-	log.Info("relay server  started on ", s.addr.String(), " ...")
+	log.Info("server  started on ", s.addr.String(), " ...")
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -51,7 +51,7 @@ func (s *Server) handle(conn *net.TCPConn) {
 		log.Warn(err)
 		return
 	}
-	//TODO:how to close connection,session??
+	//TODO:how to close connection,Session??
 	defer session.Close()
 	defer conn.Close()
 	for {
@@ -69,6 +69,6 @@ func (s *Server) handle(conn *net.TCPConn) {
 		if !ok {
 			log.Warn("protocol not supported:", stream.ID())
 		}
-		go handler.Out(stream)
+		go handler.Out(stream, session)
 	}
 }

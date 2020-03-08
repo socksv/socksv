@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/sirupsen/logrus"
 	"io"
 	"net"
+	"socksv/protocol"
 	"strconv"
 )
 
@@ -338,7 +340,7 @@ func NewReply(rep byte, atyp byte, bndaddr []byte, bndport []byte) *Reply {
 	}
 }
 
-func (p *Reply) write(w io.Writer) error {
+func (p *Reply) Write(w io.Writer) error {
 	if _, err := w.Write([]byte{p.Ver, p.Rep, p.Rsv, p.Atyp}); err != nil {
 		return err
 	}
@@ -350,7 +352,7 @@ func (p *Reply) write(w io.Writer) error {
 	}
 	return nil
 }
-func (p *Reply) read(reader io.Reader) error {
+func (p *Reply) Read(reader io.Reader) error {
 	r := bufio.NewReader(reader)
 	if by, err := r.ReadByte(); err != nil {
 		return err
@@ -412,4 +414,48 @@ type Datagram struct {
 	DstAddr []byte
 	DstPort []byte // 2 bytes
 	Data    []byte
+}
+
+func ReplyError(req *Request, inConn *net.TCPConn, cmd byte) {
+	var rep *Reply
+	if req.Atyp == ATYPIPv4 || req.Atyp == ATYPDomain {
+		rep = NewReply(cmd, ATYPIPv4, []byte{0x00, 0x00, 0x00, 0x00}, []byte{0x00, 0x00})
+	} else {
+		rep = NewReply(cmd, ATYPIPv6, []byte(net.IPv6zero), []byte{0x00, 0x00})
+	}
+	buf := bytes.NewBuffer(nil)
+	if err := rep.Write(buf); err != nil {
+		logrus.Warn(err)
+	}
+	if _, err := inConn.Write(buf.Bytes()); err != nil {
+		logrus.Warn(err)
+	}
+}
+
+type Connect = func(req *Request, conn *net.TCPConn) error
+
+func DirectConnect(req *Request, inConn *net.TCPConn) error {
+	logrus.Info("Dial:", req.Address())
+	tmp, err := net.Dial("tcp", req.Address())
+	if err != nil {
+		ReplyError(req, inConn, RepHostUnreachable)
+		return err
+	}
+	outConn := tmp.(*net.TCPConn)
+	a, addr, port, err := ParseAddress(outConn.LocalAddr().String())
+	if err != nil {
+		ReplyError(req, inConn, RepHostUnreachable)
+		return err
+	}
+	successRep := NewReply(RepSuccess, a, addr, port)
+	buf := bytes.NewBuffer(nil)
+	if err := successRep.Write(buf); err != nil {
+		return err
+	}
+	if _, err := inConn.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	defer outConn.Close()
+	protocol.ExchangeData(inConn, outConn)
+	return nil
 }

@@ -9,7 +9,7 @@ import (
 
 type Client struct {
 	serverAddr *net.TCPAddr
-	session    *smux.Session
+	Session    *smux.Session
 }
 
 func NewClient(addr string) (*Client, error) {
@@ -19,15 +19,15 @@ func NewClient(addr string) (*Client, error) {
 	}
 	c := &Client{
 		serverAddr: taddr,
-		session:    nil,
+		Session:    nil,
 	}
-	err = c.Connect()
+	err = c.connect()
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
 }
-func (c *Client) Connect() error {
+func (c *Client) connect() error {
 
 	conn, err := net.Dial("tcp", c.serverAddr.String())
 	if err != nil {
@@ -39,15 +39,15 @@ func (c *Client) Connect() error {
 	if err != nil {
 		return err
 	}
-	c.session = session
+	c.Session = session
 	return err
 }
 func (c *Client) Open(handler protocol.StreamHandler) error {
-	stream, err := c.session.OpenStreamFix(handler.ID())
+	stream, err := c.Session.OpenStreamFix(handler.ID())
 	if err != nil {
 		return err
 	}
-	if err := handler.In(stream); err != nil {
+	if err := handler.In(stream, c.Session); err != nil {
 		return err
 	}
 	return nil

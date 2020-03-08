@@ -5,7 +5,7 @@ import (
 )
 import log "github.com/sirupsen/logrus"
 
-///client <---> socks server <---> target
+///client <---> middle <---> target
 func ExchangeData(client io.ReadWriter, target io.ReadWriter) {
 	go func() {
 		var bf [1024 * 2]byte

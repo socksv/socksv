@@ -3,12 +3,11 @@ package socks5
 import (
 	"bytes"
 	log "github.com/sirupsen/logrus"
-	"socksv/protocol"
-
 	"net"
 )
 
 var SupportedCommands = []byte{CmdConnect, CmdUDP}
+var ConnectHandler = DirectConnect
 
 type Server struct {
 	UserName    string
@@ -43,10 +42,9 @@ func NewServer(addr, uname, pwd string, tcpDeadline, tcpTimeout int) (*Server, e
 	return &s, nil
 }
 func (s *Server) Listen() {
-
 	tcpListener, _ := net.ListenTCP("tcp", s.TCPAddr)
 	defer tcpListener.Close()
-	log.Info("socks5 server  started on ", s.TCPAddr.String(), " ...")
+	log.Info("socks5 server started on ", s.TCPAddr.String(), " ...")
 	//listen
 	for {
 		conn, err := tcpListener.AcceptTCP()
@@ -94,20 +92,17 @@ func request(conn *net.TCPConn) {
 		}
 	}
 	if !supported {
-		replyError(&req, conn, RepCommandNotSupported)
+		ReplyError(&req, conn, RepCommandNotSupported)
 	} else {
 		if req.Cmd == CmdConnect {
-			outConn, err := connect(&req, conn)
+			defer conn.Close()
+			err := ConnectHandler(&req, conn)
 			if err != nil {
 				log.Warn("connect target server error:", err)
 				return
 			}
-			defer outConn.Close()
-			defer conn.Close()
-			protocol.ExchangeData(conn, outConn)
 		}
 	}
-
 }
 func negotiation(conn *net.TCPConn) error {
 	var nreq NegotiationRequest
@@ -128,43 +123,4 @@ func negotiation(conn *net.TCPConn) error {
 		return err
 	}
 	return nil
-}
-func connect(req *Request, inConn *net.TCPConn) (*net.TCPConn, error) {
-	log.Info("Dial:", req.Address())
-	tmp, err := net.Dial("tcp", req.Address())
-	if err != nil {
-		replyError(req, inConn, RepHostUnreachable)
-		return nil, err
-	}
-	outConn := tmp.(*net.TCPConn)
-	a, addr, port, err := parseAddress(outConn.LocalAddr().String())
-	if err != nil {
-		replyError(req, inConn, RepHostUnreachable)
-		return nil, err
-	}
-	successRep := NewReply(RepSuccess, a, addr, port)
-	buf := bytes.NewBuffer(nil)
-	if err := successRep.write(buf); err != nil {
-		return nil, err
-	}
-	if _, err := inConn.Write(buf.Bytes()); err != nil {
-		return nil, err
-	}
-	return outConn, nil
-}
-
-func replyError(req *Request, inConn *net.TCPConn, cmd byte) {
-	var rep *Reply
-	if req.Atyp == ATYPIPv4 || req.Atyp == ATYPDomain {
-		rep = NewReply(cmd, ATYPIPv4, []byte{0x00, 0x00, 0x00, 0x00}, []byte{0x00, 0x00})
-	} else {
-		rep = NewReply(cmd, ATYPIPv6, []byte(net.IPv6zero), []byte{0x00, 0x00})
-	}
-	buf := bytes.NewBuffer(nil)
-	if err := rep.write(buf); err != nil {
-		log.Warn(err)
-	}
-	if _, err := inConn.Write(buf.Bytes()); err != nil {
-		log.Warn(err)
-	}
 }

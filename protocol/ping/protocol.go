@@ -4,6 +4,7 @@ import (
 	"errors"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"socksv/network/smux"
 	"socksv/protocol"
 	"time"
 )
@@ -27,7 +28,7 @@ func NewPing() *Ping {
 func (p *Ping) ID() protocol.ProtocolId {
 	return protocol.Ping
 }
-func (p *Ping) In(rw io.ReadWriteCloser) error {
+func (p *Ping) In(rw io.ReadWriteCloser, session *smux.Session) error {
 	defer rw.Close()
 	ticker := time.Tick(1 * time.Second)
 	timeout := time.After(p.timeout * time.Second)
@@ -63,7 +64,7 @@ func (p *Ping) In(rw io.ReadWriteCloser) error {
 
 	return nil
 }
-func (p *Ping) Out(rw io.ReadWriteCloser) error {
+func (p *Ping) Out(rw io.ReadWriteCloser, session *smux.Session) error {
 	defer rw.Close()
 	for {
 		pi := make([]byte, 1)

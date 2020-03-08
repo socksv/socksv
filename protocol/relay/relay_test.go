@@ -17,7 +17,7 @@ func TestServer(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	server.AddStreamHandler(pi)
+	//server.AddStreamHandler(pi)
 	server.AddStreamHandler(rs)
 	server.Listen()
 }
@@ -27,7 +27,7 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	go client.Open(pi)
+	//go client.Open(pi)
 	err = client.Open(rs)
 	if err != nil {
 		panic(err)
