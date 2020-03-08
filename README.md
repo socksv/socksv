@@ -44,7 +44,8 @@ socksv -p 1081
 ### 2. run as client
 
 Runs as client on your local machine.
-The following command will run socksv as client,  connect to proxy server at [proxy_ip]:1081, and specify the target website url https//www.google.com .
+
+The following command will run socksv as client,  connect to proxy server at [proxy_ip]:1081, and specify the target website url(https//www.google.com).
 
 ```bash
 socksv -s [proxy_ip]:1081 -x https//www.google.com
@@ -75,4 +76,5 @@ Here you need a chrome plugin  [SwitchyOmega](https://chrome.google.com/webstore
 
  If you are interested in this project and wanna contribute, please fork this,
   modify, and submit a pull request.
+
  You are welcome to submit issues to help improve the code and experience.You can choose what to do in the `TODO` list.
