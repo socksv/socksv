@@ -60,7 +60,9 @@ Here you need a chrome plugin  [SwitchyOmega](https://chrome.google.com/webstore
 
 > After the 3 steps configuration, your can visit whatever you want
 
-## Plan To Do
+## Plan TODO
+
+`TODO` List:
 
  * udp support for socks5
  * communicate between socksv
