@@ -45,7 +45,7 @@ socksv -p 1081
 
 Runs as client on your local machine.
 
-The following command will run socksv as client,  connect to proxy server at [proxy_ip]:1081, and specify the target website url(https//www.google.com).
+The following command will run socksv as client,  connect to proxy server at [proxy_ip]:1081, and specify the target website url(e.g.,https//www.google.com).
 
 ```bash
 socksv -s [proxy_ip]:1081 -x https//www.google.com
