@@ -130,9 +130,9 @@ func (s *Session) OpenStream() (*Stream, error) {
 	}
 	s.nextStreamIDLock.Unlock()
 
-	stream := newStream(sid, s.config.MaxFrameSize, s)
+	stream := newStream(0, sid, s.config.MaxFrameSize, s)
 
-	if _, err := s.writeFrame(newFrame(byte(s.config.Version), cmdSYN, sid)); err != nil {
+	if _, err := s.writeFrame(newFrame(byte(s.config.Version), cmdSYN, 0, sid)); err != nil {
 		return nil, err
 	}
 
@@ -151,20 +151,34 @@ func (s *Session) OpenStream() (*Stream, error) {
 	}
 }
 
-//open stream with fixed id
-//if id=0,the id will generated +=2
-func (s *Session) OpenStreamFix(id uint32) (*Stream, error) {
+//Open protocl with specific id(>0).
+func (s *Session) OpenProtocol(pid byte) (*Stream, error) {
 	if s.IsClosed() {
 		return nil, io.ErrClosedPipe
 	}
+	if pid == 0 {
+		return nil, errors.New("pid should >0")
+	}
 
 	// generate stream id
-	s.nextStreamID = id
+	s.nextStreamIDLock.Lock()
+	if s.goAway > 0 {
+		s.nextStreamIDLock.Unlock()
+		return nil, ErrGoAway
+	}
+
+	s.nextStreamID += 2
 	sid := s.nextStreamID
+	if sid == sid%2 { // stream-id overflows
+		s.goAway = 1
+		s.nextStreamIDLock.Unlock()
+		return nil, ErrGoAway
+	}
+	s.nextStreamIDLock.Unlock()
 
-	stream := newStream(sid, s.config.MaxFrameSize, s)
+	stream := newStream(pid, sid, s.config.MaxFrameSize, s)
 
-	if _, err := s.writeFrame(newFrame(byte(s.config.Version), cmdSYN, sid)); err != nil {
+	if _, err := s.writeFrame(newFrame(byte(s.config.Version), cmdSYN, pid, sid)); err != nil {
 		return nil, err
 	}
 
@@ -354,12 +368,13 @@ func (s *Session) recvLoop() {
 				return
 			}
 			sid := hdr.StreamID()
+			pid := hdr.ProtocolID()
 			switch hdr.Cmd() {
 			case cmdNOP:
 			case cmdSYN:
 				s.streamLock.Lock()
 				if _, ok := s.streams[sid]; !ok {
-					stream := newStream(sid, s.config.MaxFrameSize, s)
+					stream := newStream(pid, sid, s.config.MaxFrameSize, s)
 					s.streams[sid] = stream
 					select {
 					case s.chAccepts <- stream:
@@ -420,7 +435,7 @@ func (s *Session) keepalive() {
 	for {
 		select {
 		case <-tickerPing.C:
-			s.writeFrameInternal(newFrame(byte(s.config.Version), cmdNOP, 0), tickerPing.C, 0)
+			s.writeFrameInternal(newFrame(byte(s.config.Version), cmdNOP, 0, 0), tickerPing.C, 0)
 			s.notifyBucket() // force a signal to the recvLoop
 		case <-tickerTimeout.C:
 			if !atomic.CompareAndSwapInt32(&s.dataReady, 1, 0) {
@@ -486,7 +501,8 @@ func (s *Session) sendLoop() {
 			buf[0] = request.frame.ver
 			buf[1] = request.frame.cmd
 			binary.LittleEndian.PutUint16(buf[2:], uint16(len(request.frame.data)))
-			binary.LittleEndian.PutUint32(buf[4:], request.frame.sid)
+			buf[4] = request.frame.pid
+			binary.LittleEndian.PutUint32(buf[5:], request.frame.sid)
 
 			if len(vec) > 0 {
 				vec[0] = buf[:headerSize]

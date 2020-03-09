@@ -32,20 +32,23 @@ const (
 	sizeOfVer    = 1
 	sizeOfCmd    = 1
 	sizeOfLength = 2
+	sizeOfPid    = 1
 	sizeOfSid    = 4
-	headerSize   = sizeOfVer + sizeOfCmd + sizeOfSid + sizeOfLength
+	headerSize   = sizeOfVer + sizeOfCmd + sizeOfPid + sizeOfSid + sizeOfLength
 )
 
 // Frame defines a packet from or to be multiplexed into a single connection
+// Protocol ID is to recognize the spec protocl
 type Frame struct {
 	ver  byte
 	cmd  byte
+	pid  byte //protocol id
 	sid  uint32
 	data []byte
 }
 
-func newFrame(version byte, cmd byte, sid uint32) Frame {
-	return Frame{ver: version, cmd: cmd, sid: sid}
+func newFrame(version byte, cmd byte, pid byte, sid uint32) Frame {
+	return Frame{ver: version, cmd: cmd, pid: pid, sid: sid}
 }
 
 type rawHeader [headerSize]byte
@@ -61,14 +64,17 @@ func (h rawHeader) Cmd() byte {
 func (h rawHeader) Length() uint16 {
 	return binary.LittleEndian.Uint16(h[2:])
 }
+func (h rawHeader) ProtocolID() byte {
+	return h[4]
+}
 
 func (h rawHeader) StreamID() uint32 {
-	return binary.LittleEndian.Uint32(h[4:])
+	return binary.LittleEndian.Uint32(h[5:])
 }
 
 func (h rawHeader) String() string {
-	return fmt.Sprintf("Version:%d Cmd:%d StreamID:%d Length:%d",
-		h.Version(), h.Cmd(), h.StreamID(), h.Length())
+	return fmt.Sprintf("Version:%d Cmd:%d ProtocolID:%d StreamID:%d Length:%d",
+		h.Version(), h.Cmd(), h.ProtocolID(), h.StreamID(), h.Length())
 }
 
 type updHeader [szCmdUPD]byte

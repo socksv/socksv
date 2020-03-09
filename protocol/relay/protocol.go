@@ -160,7 +160,7 @@ func (s *RelayStream) In(rw io.ReadWriteCloser, session *smux.Session) error {
 	if rep.Status != StatusSuccess {
 		return errors.New("connect failed")
 	}
-	log.Infof("accept: ", s.Addr)
+	log.Info("accept: ", s.Addr)
 	//exchange data:socks5 client<--->proxy server
 	//defer rw.Close()
 	//defer s.conn.Close()

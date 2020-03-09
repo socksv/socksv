@@ -6,9 +6,6 @@ import (
 	"path"
 	"runtime"
 	"socksv/app"
-	"socksv/network"
-	"socksv/protocol/relay"
-	"socksv/protocol/socks5"
 	"strconv"
 )
 
@@ -40,6 +37,7 @@ func main() {
 		logLevel = logrus.ErrorLevel
 	}
 	logrus.SetLevel(logLevel)
+	logrus.SetReportCaller(true)
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05",
@@ -51,7 +49,7 @@ func main() {
 		},
 	})
 	if server == "" {
-		StartProxyServer("0.0.0.0:" + serverPort)
+		app.StartProxyServer("0.0.0.0:" + serverPort)
 	} else {
 		//go StartSocks5Server("0.0.0.0:" + port)
 		//client := StartProxyClient(server)
@@ -63,26 +61,4 @@ func main() {
 		client.Accept()
 	}
 
-}
-func StartSocks5Server(addr string) {
-	server, err := socks5.NewServer(addr, "", "", 100, 100)
-	if err != nil {
-		panic(err)
-	}
-	server.Listen()
-}
-func StartProxyServer(addr string) {
-	server, err := network.NewServer(addr)
-	if err != nil {
-		panic(err)
-	}
-	server.AddStreamHandler(relay.NewRelayStreamServer())
-	server.Listen()
-}
-func StartProxyClient(addr string) *network.Client {
-	client, err := network.NewClient(addr)
-	if err != nil {
-		panic(err)
-	}
-	return client
 }

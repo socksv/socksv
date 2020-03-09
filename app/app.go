@@ -4,9 +4,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"net"
 	"socksv/network"
+	"socksv/protocol/ping"
 	"socksv/protocol/relay"
 	"socksv/protocol/socks5"
 )
+
+var EnablePing = false
 
 type Client struct {
 	socks5Server *socks5.Server
@@ -21,6 +24,9 @@ func NewClient(socks5Addr, proxyAddr string) *Client {
 	client, err := network.NewClient(proxyAddr)
 	if err != nil {
 		panic(err)
+	}
+	if EnablePing {
+		go client.Open(ping.NewPing())
 	}
 	c := &Client{
 		socks5Server: server,
@@ -42,4 +48,16 @@ func (c *Client) ProxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
 //accept socks5 inbound stream
 func (c *Client) Accept() {
 	c.socks5Server.Listen()
+}
+
+func StartProxyServer(addr string) {
+	server, err := network.NewServer(addr)
+	if err != nil {
+		panic(err)
+	}
+	if EnablePing {
+		go server.AddStreamHandler(ping.NewPing())
+	}
+	server.AddStreamHandler(relay.NewRelayStreamServer())
+	server.Listen()
 }

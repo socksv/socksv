@@ -4,8 +4,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"path"
 	"runtime"
-	"socksv/network"
-	"socksv/protocol/relay"
 	"strconv"
 	"testing"
 )
@@ -23,13 +21,7 @@ func TestServer(t *testing.T) {
 			return "", "[" + filename + ":" + strconv.Itoa(f.Line) + "]"
 		},
 	})
-	server, err := network.NewServer("0.0.0.0:8080")
-	if err != nil {
-		panic(err)
-	}
-	//server.AddStreamHandler(pi)
-	server.AddStreamHandler(relay.NewRelayStreamServer())
-	server.Listen()
+	StartProxyServer("0.0.0.0:8080")
 }
 func TestClient(t *testing.T) {
 	logrus.SetLevel(logrus.TraceLevel)

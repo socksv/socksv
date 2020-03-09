@@ -5,7 +5,7 @@ import (
 	"socksv/network/smux"
 )
 
-type ProtocolId = uint32
+type ProtocolId = byte
 type StreamHandler interface {
 	ID() ProtocolId
 	//client side

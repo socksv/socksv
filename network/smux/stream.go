@@ -11,6 +11,7 @@ import (
 
 // Stream implements net.Conn
 type Stream struct {
+	pid  byte
 	id   uint32
 	sess *Session
 
@@ -47,8 +48,9 @@ type Stream struct {
 }
 
 // newStream initiates a Stream struct
-func newStream(id uint32, frameSize int, sess *Session) *Stream {
+func newStream(pid byte, id uint32, frameSize int, sess *Session) *Stream {
 	s := new(Stream)
+	s.pid = pid
 	s.id = id
 	s.chReadEvent = make(chan struct{}, 1)
 	s.chUpdate = make(chan struct{}, 1)
@@ -63,6 +65,11 @@ func newStream(id uint32, frameSize int, sess *Session) *Stream {
 // ID returns the unique stream ID.
 func (s *Stream) ID() uint32 {
 	return s.id
+}
+
+// Returns protocol ID
+func (s *Stream) ProtocolID() byte {
+	return s.pid
 }
 
 // Read implements net.Conn
@@ -250,7 +257,7 @@ func (s *Stream) sendWindowUpdate(consumed uint32) error {
 		deadline = timer.C
 	}
 
-	frame := newFrame(byte(s.sess.config.Version), cmdUPD, s.id)
+	frame := newFrame(byte(s.sess.config.Version), cmdUPD, s.pid, s.id)
 	var hdr updHeader
 	binary.LittleEndian.PutUint32(hdr[:], consumed)
 	binary.LittleEndian.PutUint32(hdr[4:], uint32(s.sess.config.MaxStreamBuffer))
@@ -310,7 +317,7 @@ func (s *Stream) Write(b []byte) (n int, err error) {
 
 	// frame split and transmit
 	sent := 0
-	frame := newFrame(byte(s.sess.config.Version), cmdPSH, s.id)
+	frame := newFrame(byte(s.sess.config.Version), cmdPSH, s.pid, s.id)
 	bts := b
 	for len(bts) > 0 {
 		sz := len(bts)
@@ -353,7 +360,7 @@ func (s *Stream) writeV2(b []byte) (n int, err error) {
 
 	// frame split and transmit process
 	sent := 0
-	frame := newFrame(byte(s.sess.config.Version), cmdPSH, s.id)
+	frame := newFrame(byte(s.sess.config.Version), cmdPSH, s.pid, s.id)
 
 	for {
 		// per stream sliding window control
@@ -428,7 +435,7 @@ func (s *Stream) Close() error {
 	})
 
 	if once {
-		_, err = s.sess.writeFrame(newFrame(byte(s.sess.config.Version), cmdFIN, s.id))
+		_, err = s.sess.writeFrame(newFrame(byte(s.sess.config.Version), cmdFIN, s.pid, s.id))
 		s.sess.streamClosed(s.id)
 		return err
 	} else {
