@@ -93,6 +93,7 @@ func request(conn *net.TCPConn) {
 	}
 	if !supported {
 		ReplyError(&req, conn, RepCommandNotSupported)
+		conn.Close()
 	} else {
 		if req.Cmd == CmdConnect {
 			defer conn.Close()

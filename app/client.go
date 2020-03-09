@@ -34,7 +34,7 @@ func (c *Client) ProxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
 	err := c.proxyClient.Open(stream)
 	if err != nil {
 		socks5.ReplyError(req, inConn, socks5.RepHostUnreachable)
-		logrus.Warn(err)
+		logrus.Warn(req.Address()+": ", err)
 	}
 	return nil
 }

@@ -455,7 +455,8 @@ func DirectConnect(req *Request, inConn *net.TCPConn) error {
 	if _, err := inConn.Write(buf.Bytes()); err != nil {
 		return err
 	}
-	defer outConn.Close()
+	//defer inConn.Close()
+	//defer outConn.Close()
 	protocol.ExchangeData(inConn, outConn)
 	return nil
 }

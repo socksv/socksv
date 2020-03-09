@@ -6,14 +6,22 @@ import (
 import log "github.com/sirupsen/logrus"
 
 ///client <---> middle <---> target
-func ExchangeData(client io.ReadWriter, target io.ReadWriter) {
+func ExchangeData(client io.ReadWriteCloser, target io.ReadWriteCloser) {
+	defer client.Close()
+	defer target.Close()
+	iseof := false
 	go func() {
 		var bf [1024 * 2]byte
 		for {
 			//read from target server
 			n, err := target.Read(bf[:])
 			if err != nil {
-				log.Trace("<---target:", err)
+				if !iseof {
+					log.Trace("<---target:", err)
+				}
+				if err == io.EOF {
+					iseof = true
+				}
 				return
 			}
 			//write to client
@@ -21,6 +29,7 @@ func ExchangeData(client io.ReadWriter, target io.ReadWriter) {
 				log.Trace("--->client:", err)
 				return
 			}
+
 		}
 	}()
 	var bf [1024 * 2]byte
@@ -28,7 +37,12 @@ func ExchangeData(client io.ReadWriter, target io.ReadWriter) {
 		//read the request from client and send it to target server
 		i, err := client.Read(bf[:])
 		if err != nil {
-			log.Trace("<---client:", err)
+			if !iseof {
+				log.Trace("<---client:", err)
+			}
+			if err == io.EOF {
+				iseof = true
+			}
 			return
 		}
 		if _, err := target.Write(bf[0:i]); err != nil {

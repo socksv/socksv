@@ -160,7 +160,10 @@ func (s *RelayStream) In(rw io.ReadWriteCloser, session *smux.Session) error {
 	if rep.Status != StatusSuccess {
 		return errors.New("connect failed")
 	}
+	log.Infof("accept: ", s.Addr)
 	//exchange data:socks5 client<--->proxy server
+	//defer rw.Close()
+	//defer s.conn.Close()
 	protocol.ExchangeData(s.conn, rw)
 	return nil
 }
@@ -191,7 +194,7 @@ func (s *RelayStream) Out(rw io.ReadWriteCloser, session *smux.Session) error {
 	tunnel(rw, targetAddr)
 	return nil
 }
-func tunnel(rw io.ReadWriter, targetAddr string) {
+func tunnel(rw io.ReadWriteCloser, targetAddr string) {
 	tmp, err := net.Dial("tcp", targetAddr)
 	if err != nil {
 		_ = writeReply(rw, StatusTargetUnreachable, nil)
@@ -200,8 +203,10 @@ func tunnel(rw io.ReadWriter, targetAddr string) {
 	}
 	log.Info("dial:", targetAddr)
 	conn := tmp.(*net.TCPConn)
-	defer conn.Close()
+
 	_ = writeReply(rw, StatusSuccess, nil)
+	//defer conn.Close()
+	//defer rw.Close()
 	//exchange data:proxy server<--->target website
 	protocol.ExchangeData(rw, conn)
 }

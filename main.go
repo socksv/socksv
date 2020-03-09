@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"github.com/sirupsen/logrus"
+	"path"
+	"runtime"
 	"socksv/app"
 	"socksv/network"
 	"socksv/protocol/relay"
 	"socksv/protocol/socks5"
+	"strconv"
 )
 
 var logLevel = logrus.DebugLevel
@@ -40,6 +43,12 @@ func main() {
 	logrus.SetFormatter(&logrus.TextFormatter{
 		FullTimestamp:   true,
 		TimestampFormat: "2006-01-02 15:04:05",
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			//s := strings.Split(f.Function, ".")
+			//funcname := s[len(s)-1]
+			_, filename := path.Split(f.File)
+			return "", "[" + filename + ":" + strconv.Itoa(f.Line) + "]"
+		},
 	})
 	if server == "" {
 		StartProxyServer("0.0.0.0:" + serverPort)

@@ -43,7 +43,7 @@ func (c *Client) connect() error {
 	return err
 }
 func (c *Client) Open(handler protocol.StreamHandler) error {
-	stream, err := c.Session.OpenStreamFix(handler.ID())
+	stream, err := c.Session.OpenStream()
 	if err != nil {
 		return err
 	}

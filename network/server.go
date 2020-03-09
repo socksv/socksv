@@ -60,15 +60,10 @@ func (s *Server) handle(conn *net.TCPConn) {
 			log.Warn(err)
 			break
 		}
-		//TODO:delete
-		if _, ok := s.streams[stream.ID()]; !ok {
-			log.Debug("protocol accept:", stream.ID())
-		}
-		s.streams[stream.ID()] = stream
-		handler, ok := s.handlers[stream.ID()]
-		if !ok {
-			log.Warn("protocol not supported:", stream.ID())
-		}
+		handler, _ := s.handlers[protocol.Relay]
+		//if !ok {
+		//	log.Warn("protocol not supported:", stream.ID())
+		//}
 		go handler.Out(stream, session)
 	}
 }
