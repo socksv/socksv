@@ -42,7 +42,7 @@ func (c *Client) connect() error {
 	c.Session = session
 	return err
 }
-func (c *Client) Open(handler protocol.StreamHandler) error {
+func (c *Client) Open(handler protocol.Protocol) error {
 	stream, err := c.Session.OpenProtocol(handler.ID())
 	if err != nil {
 		return err

@@ -1,12 +1,15 @@
-package protocol
+package utils
 
 import (
+	log "github.com/sirupsen/logrus"
 	"io"
 )
-import log "github.com/sirupsen/logrus"
 
-///client <---> middle <---> target
-func ExchangeData(client io.ReadWriteCloser, target io.ReadWriteCloser) {
+//Proxy exchange data of client and target
+//client <---> middle <---> target
+//make sure both client and target reader and writer close,and return when
+//stream is EOF
+func ProxyData(client io.ReadWriteCloser, target io.ReadWriteCloser) {
 	defer client.Close()
 	defer target.Close()
 	iseof := false

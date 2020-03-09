@@ -1,4 +1,4 @@
-package relay
+package sv
 
 import (
 	"github.com/sirupsen/logrus"
@@ -17,7 +17,7 @@ func TestServer(t *testing.T) {
 		panic(err)
 	}
 	//server.AddStreamHandler(pi)
-	server.AddStreamHandler(NewRelayStreamServer())
+	server.AddStreamHandler(NewSocksVProtocolEmpty())
 	server.Listen()
 }
 func TestDial(t *testing.T) {

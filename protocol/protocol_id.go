@@ -1,6 +1,6 @@
 package protocol
 
 const (
-	Ping  = 1
-	Relay = 2
+	Ping   = 1
+	SocksV = 2
 )

@@ -10,8 +10,8 @@ import (
 type Server struct {
 	addr     *net.TCPAddr
 	session  *smux.Session
-	streams  map[protocol.ProtocolId]*smux.Stream
-	handlers map[protocol.ProtocolId]protocol.StreamHandler
+	streams  map[protocol.ProtocolID]*smux.Stream
+	handlers map[protocol.ProtocolID]protocol.Protocol
 }
 
 func NewServer(addr string) (*Server, error) {
@@ -22,11 +22,11 @@ func NewServer(addr string) (*Server, error) {
 	return &Server{
 		addr:     taddr,
 		session:  nil,
-		streams:  make(map[protocol.ProtocolId]*smux.Stream),
-		handlers: make(map[protocol.ProtocolId]protocol.StreamHandler),
+		streams:  make(map[protocol.ProtocolID]*smux.Stream),
+		handlers: make(map[protocol.ProtocolID]protocol.Protocol),
 	}, nil
 }
-func (s *Server) AddStreamHandler(handler protocol.StreamHandler) {
+func (s *Server) AddStreamHandler(handler protocol.Protocol) {
 	s.handlers[handler.ID()] = handler
 }
 func (s *Server) Listen() {
@@ -63,6 +63,7 @@ func (s *Server) handle(conn *net.TCPConn) {
 		handler, ok := s.handlers[stream.ProtocolID()]
 		if !ok {
 			log.Warn("protocol not supported:", stream.ID())
+			break
 		}
 		go handler.Out(stream, session)
 	}

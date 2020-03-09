@@ -5,18 +5,13 @@ import (
 	"socksv/network/smux"
 )
 
-type ProtocolId = byte
-type StreamHandler interface {
-	ID() ProtocolId
+type ProtocolID = byte
+type Protocol interface {
+	ID() ProtocolID
 	//client side
 	//remember to close rw
 	In(rw io.ReadWriteCloser, session *smux.Session) error
 	//server side
 	//remember to close rw
 	Out(rw io.ReadWriteCloser, session *smux.Session) error
-}
-
-type Protocol struct {
-	smux.Stream
-	pid uint32
 }

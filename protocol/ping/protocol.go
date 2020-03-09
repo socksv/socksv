@@ -25,7 +25,7 @@ func NewPing() *Ping {
 		timeout: time.Duration(Timeout),
 	}
 }
-func (p *Ping) ID() protocol.ProtocolId {
+func (p *Ping) ID() protocol.ProtocolID {
 	return protocol.Ping
 }
 func (p *Ping) In(rw io.ReadWriteCloser, session *smux.Session) error {

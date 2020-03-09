@@ -7,7 +7,7 @@ import (
 )
 
 var SupportedCommands = []byte{CmdConnect, CmdUDP}
-var ConnectHandler = DirectConnect
+var ConnectHandler = directConnect
 
 type Server struct {
 	UserName    string

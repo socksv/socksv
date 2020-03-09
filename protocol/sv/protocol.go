@@ -1,4 +1,4 @@
-package relay
+package sv
 
 import (
 	"bytes"
@@ -8,7 +8,8 @@ import (
 	"net"
 	"socksv/network/smux"
 	"socksv/protocol"
-	"socksv/protocol/socks5"
+	"socksv/socks5"
+	"socksv/utils"
 )
 
 const (
@@ -22,8 +23,6 @@ const (
 	StatusUnsupportedCmd     = 0x02
 	StatusUnSupportedEncrypt = 0x03
 	StatusTargetUnreachable  = 0x04
-	ProtocolID               = 1
-	PingProtocolID           = 2
 )
 const readLen = 1024 * 2
 
@@ -109,42 +108,28 @@ func writeReply(writer io.Writer, status byte, data []byte) error {
 	}
 	return nil
 }
-func readContent(stream io.ReadWriteCloser, buf chan []byte) {
-	defer stream.Close()
-	for {
-		var bf [readLen]byte
-		n, err := stream.Read(bf[:])
-		if err != nil {
-			log.Trace("<---socksv server:", err)
-			return
-		}
-		buf <- bf[0:n]
-	}
-}
 
-type RelayStream struct {
+type SocksVProtocol struct {
 	Addr string
 	req  *socks5.Request
 	//connection with socks5 client
 	conn *net.TCPConn
 }
 
-func NewRelayStream(addr string, req *socks5.Request, inConn *net.TCPConn) *RelayStream {
-	return &RelayStream{
+func NewSocksVProtocol(addr string, req *socks5.Request, inConn *net.TCPConn) *SocksVProtocol {
+	return &SocksVProtocol{
 		Addr: addr,
 		req:  req,
 		conn: inConn,
 	}
 }
-func NewRelayStreamServer() *RelayStream {
-	return &RelayStream{
-		Addr: "",
-	}
+func NewSocksVProtocolEmpty() *SocksVProtocol {
+	return &SocksVProtocol{}
 }
-func (s *RelayStream) ID() protocol.ProtocolId {
-	return protocol.Relay
+func (s *SocksVProtocol) ID() protocol.ProtocolID {
+	return protocol.SocksV
 }
-func (s *RelayStream) In(rw io.ReadWriteCloser, session *smux.Session) error {
+func (s *SocksVProtocol) In(rw io.ReadWriteCloser, session *smux.Session) error {
 	//write reply to socks5 client
 	if err := s.writeToSocks5(session); err != nil {
 		return err
@@ -162,12 +147,10 @@ func (s *RelayStream) In(rw io.ReadWriteCloser, session *smux.Session) error {
 	}
 	log.Info("accept: ", s.Addr)
 	//exchange data:socks5 client<--->proxy server
-	//defer rw.Close()
-	//defer s.conn.Close()
-	protocol.ExchangeData(s.conn, rw)
+	utils.ProxyData(s.conn, rw)
 	return nil
 }
-func (s *RelayStream) writeToSocks5(session *smux.Session) error {
+func (s *SocksVProtocol) writeToSocks5(session *smux.Session) error {
 	a, addr, port, err := socks5.ParseAddress(session.LocalAddr().String())
 	if err != nil {
 		socks5.ReplyError(s.req, s.conn, socks5.RepHostUnreachable)
@@ -184,17 +167,16 @@ func (s *RelayStream) writeToSocks5(session *smux.Session) error {
 	return nil
 }
 
-func (s *RelayStream) Out(rw io.ReadWriteCloser, session *smux.Session) error {
-	defer rw.Close()
+func (s *SocksVProtocol) Out(rw io.ReadWriteCloser, session *smux.Session) error {
 	targetAddr, err := acceptConnect(rw)
 	if err != nil {
 		log.Warn(err)
 		return err
 	}
-	tunnel(rw, targetAddr)
+	dialTarget(rw, targetAddr)
 	return nil
 }
-func tunnel(rw io.ReadWriteCloser, targetAddr string) {
+func dialTarget(rw io.ReadWriteCloser, targetAddr string) {
 	tmp, err := net.Dial("tcp", targetAddr)
 	if err != nil {
 		_ = writeReply(rw, StatusTargetUnreachable, nil)
@@ -205,10 +187,8 @@ func tunnel(rw io.ReadWriteCloser, targetAddr string) {
 	conn := tmp.(*net.TCPConn)
 
 	_ = writeReply(rw, StatusSuccess, nil)
-	//defer conn.Close()
-	//defer rw.Close()
 	//exchange data:proxy server<--->target website
-	protocol.ExchangeData(rw, conn)
+	utils.ProxyData(rw, conn)
 }
 
 func acceptConnect(stream io.ReadWriteCloser) (string, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io"
 	"net"
-	"socksv/protocol"
+	"socksv/utils"
 	"strconv"
 )
 
@@ -434,7 +434,7 @@ func ReplyError(req *Request, inConn *net.TCPConn, cmd byte) {
 
 type Connect = func(req *Request, conn *net.TCPConn) error
 
-func DirectConnect(req *Request, inConn *net.TCPConn) error {
+func directConnect(req *Request, inConn *net.TCPConn) error {
 	logrus.Info("Dial:", req.Address())
 	tmp, err := net.Dial("tcp", req.Address())
 	if err != nil {
@@ -455,8 +455,6 @@ func DirectConnect(req *Request, inConn *net.TCPConn) error {
 	if _, err := inConn.Write(buf.Bytes()); err != nil {
 		return err
 	}
-	//defer inConn.Close()
-	//defer outConn.Close()
-	protocol.ExchangeData(inConn, outConn)
+	utils.ProxyData(inConn, outConn)
 	return nil
 }

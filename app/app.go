@@ -5,8 +5,8 @@ import (
 	"net"
 	"socksv/network"
 	"socksv/protocol/ping"
-	"socksv/protocol/relay"
-	"socksv/protocol/socks5"
+	"socksv/protocol/sv"
+	"socksv/socks5"
 )
 
 var EnablePing = false
@@ -32,11 +32,14 @@ func NewClient(socks5Addr, proxyAddr string) *Client {
 		socks5Server: server,
 		proxyClient:  client,
 	}
-	socks5.ConnectHandler = c.ProxyConnect
+	//set socks5 handler to ProxyConnect
+	socks5.ConnectHandler = c.proxyConnect
 	return c
 }
-func (c *Client) ProxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
-	stream := relay.NewRelayStream(req.Address(), req, inConn)
+
+//ProxyConnect is used in socks5
+func (c *Client) proxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
+	stream := sv.NewSocksVProtocol(req.Address(), req, inConn)
 	err := c.proxyClient.Open(stream)
 	if err != nil {
 		socks5.ReplyError(req, inConn, socks5.RepHostUnreachable)
@@ -49,7 +52,10 @@ func (c *Client) ProxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
 func (c *Client) Accept() {
 	c.socks5Server.Listen()
 }
-
+func StartProxyClient(socksListenAddr, proxyServerAddr string) {
+	client := NewClient(socksListenAddr, proxyServerAddr)
+	client.Accept()
+}
 func StartProxyServer(addr string) {
 	server, err := network.NewServer(addr)
 	if err != nil {
@@ -58,6 +64,6 @@ func StartProxyServer(addr string) {
 	if EnablePing {
 		go server.AddStreamHandler(ping.NewPing())
 	}
-	server.AddStreamHandler(relay.NewRelayStreamServer())
+	server.AddStreamHandler(sv.NewSocksVProtocolEmpty())
 	server.Listen()
 }
