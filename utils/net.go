@@ -1,7 +1,8 @@
 package utils
 
 import (
-	log "github.com/sirupsen/logrus"
+	"encoding/binary"
+	"github.com/sirupsen/logrus"
 	"io"
 )
 
@@ -10,47 +11,111 @@ import (
 //make sure both client and target reader and writer close,and return when
 //stream is EOF
 func ProxyData(client io.ReadWriteCloser, target io.ReadWriteCloser) {
-	//defer client.Close()
-	//defer target.Close()
-	iseof := false
 	go func() {
-		var bf [1024 * 2]byte
-		for {
-			//read from target server
-			n, err := target.Read(bf[:])
-			if err != nil {
-				if !iseof {
-					log.Trace("<---target:", err)
-				}
-				if err == io.EOF {
-					iseof = true
-				}
-				return
-			}
-			//write to client
-			if _, err := client.Write(bf[0:n]); err != nil {
-				log.Trace("--->client:", err)
-				return
-			}
-
+		if err := WriteTo(target, client, false, false); err != nil {
+			logrus.Trace("target ---> client error:", err)
 		}
 	}()
+	err := WriteTo(client, target, false, false)
+	if err != nil {
+		logrus.Trace("client ---> target error:", err)
+	}
+	//defer client.Close()
+	//defer target.Close()
+	//iseof := false
+	//go func() {
+	//	var bf [1024 * 2]byte
+	//	for {
+	//		//read from target server
+	//		n, err := target.Read(bf[:])
+	//		if err != nil {
+	//			if !iseof {
+	//				log.Trace("<---target:", err)
+	//			}
+	//			if err == io.EOF {
+	//				iseof = true
+	//			}
+	//			return
+	//		}
+	//		//write to client
+	//		if _, err := client.Write(bf[0:n]); err != nil {
+	//			log.Trace("--->client:", err)
+	//			return
+	//		}
+	//
+	//	}
+	//}()
+	//var bf [1024 * 2]byte
+	//for {
+	//	//read the request from client and send it to target server
+	//	i, err := client.Read(bf[:])
+	//	if err != nil {
+	//		if !iseof {
+	//			log.Trace("<---client:", err)
+	//		}
+	//		if err == io.EOF {
+	//			iseof = true
+	//		}
+	//		return
+	//	}
+	//	if _, err := target.Write(bf[0:i]); err != nil {
+	//		log.Trace("--->server:", err)
+	//		return
+	//	}
+	//}
+}
+
+//Read data from `from` and write to `to`
+func WriteTo(from io.ReadWriter, to io.ReadWriter, rd, we bool) error {
 	var bf [1024 * 2]byte
 	for {
-		//read the request from client and send it to target server
-		i, err := client.Read(bf[:])
-		if err != nil {
-			if !iseof {
-				log.Trace("<---client:", err)
+		var bb []byte
+		if rd {
+			if by, err := decrypt(from); err != nil {
+				return err
+			} else {
+				bb = by
 			}
-			if err == io.EOF {
-				iseof = true
+		} else {
+			i, err := from.Read(bf[:])
+			if err != nil {
+				return err
 			}
-			return
+			bb = bf[:i]
 		}
-		if _, err := target.Write(bf[0:i]); err != nil {
-			log.Trace("--->server:", err)
-			return
+		if we {
+			//encrypt data
+			bb = encrypt(bb)
+		}
+		if _, err := to.Write(bb); err != nil {
+			return err
 		}
 	}
+}
+
+const lengthSize = 2
+
+//decrypt with length
+func decrypt(reader io.Reader) ([]byte, error) {
+	byLen := make([]byte, lengthSize)
+	if _, err := io.ReadFull(reader, byLen); err != nil {
+		return nil, err
+	}
+	length := binary.BigEndian.Uint16(byLen)
+	data := make([]byte, length)
+	if _, err := io.ReadFull(reader, data); err != nil {
+		return nil, err
+	}
+	//fmt.Printf("<---:%x\n", data)
+	return AesDecrypt(data, Key), nil
+}
+
+//encrypt with length
+func encrypt(data []byte) []byte {
+	wr := AesEncrypt(data, Key)
+	bb := make([]byte, len(wr)+lengthSize)
+	binary.BigEndian.PutUint16(bb, uint16(len(wr)))
+	copy(bb[lengthSize:], wr)
+	//fmt.Printf("-->:%x\n", bb)
+	return bb
 }

@@ -25,6 +25,8 @@ const (
 )
 const readLen = 1024 * 2
 
+var Encrypt = true
+
 type Request struct {
 	Version byte
 	Cmd     byte
@@ -45,6 +47,9 @@ func (req *Request) Read(reader io.Reader) error {
 	c := make([]byte, req.Length)
 	if _, err := io.ReadFull(reader, c); err != nil {
 		return err
+	}
+	if Encrypt {
+		c = utils.AesDecrypt(c, utils.Key)
 	}
 	req.Data = c
 	return nil
@@ -74,6 +79,9 @@ func (rep *Reply) Read(reader io.Reader) error {
 	if _, err := io.ReadFull(reader, c); err != nil {
 		return err
 	}
+	if Encrypt {
+		c = utils.AesDecrypt(c, utils.Key)
+	}
 	rep.Data = c
 	return nil
 }
@@ -83,6 +91,9 @@ func (h Reply) Bytes() []byte {
 }
 
 func writeRequest(writer io.Writer, cmd byte, data []byte) error {
+	if Encrypt {
+		data = utils.AesEncrypt(data, utils.Key)
+	}
 	header := Request{
 		Version: Version1,
 		Cmd:     cmd,
@@ -96,6 +107,9 @@ func writeRequest(writer io.Writer, cmd byte, data []byte) error {
 	return nil
 }
 func writeReply(writer io.Writer, status byte, data []byte) error {
+	if Encrypt {
+		data = utils.AesEncrypt(data, utils.Key)
+	}
 	header := Reply{
 		Version: Version1,
 		Status:  status,
@@ -148,7 +162,12 @@ func (s *SocksVProtocol) In(rw io.ReadWriteCloser, session *smux.Session) error 
 	}
 	log.Info("accept: ", addr)
 	//exchange data:socks5 client<--->proxy server
-	utils.ProxyData(s.conn, rw)
+	if Encrypt {
+		clientExchange(s.conn, rw)
+	} else {
+		utils.ProxyData(s.conn, rw)
+	}
+
 	return nil
 }
 
@@ -174,7 +193,12 @@ func dialTarget(rw io.ReadWriteCloser, targetAddr string) {
 	defer conn.Close()
 	_ = writeReply(rw, StatusSuccess, nil)
 	//exchange data:proxy server<--->target website
-	utils.ProxyData(rw, conn)
+	if Encrypt {
+		serverExchange(rw, conn)
+	} else {
+		utils.ProxyData(rw, conn)
+	}
+
 }
 
 func readRequest(stream io.ReadWriteCloser) (string, error) {
@@ -196,4 +220,32 @@ func readRequest(stream io.ReadWriteCloser) (string, error) {
 	}
 	targetAddr := string(req.Data)
 	return targetAddr, nil
+}
+
+//Read from socks5 client,encrypt it and send to proxy server
+//Read from proxy server,decrypt it and send to socks5 client
+func clientExchange(client io.ReadWriteCloser, target io.ReadWriteCloser) {
+	go func() {
+		if err := utils.WriteTo(target, client, true, false); err != nil {
+			log.Trace("proxy server ---> proxy client ---> socks5 client: error:", err)
+		}
+	}()
+	err := utils.WriteTo(client, target, false, true)
+	if err != nil {
+		log.Trace("socks5 client ---> proxy client ---> proxy server: error:", err)
+	}
+}
+
+//Read from proxy client,decrypt it and send to target
+//Read from target,encrypt it and send to proxy client
+func serverExchange(client io.ReadWriteCloser, target io.ReadWriteCloser) {
+	go func() {
+		if err := utils.WriteTo(target, client, false, true); err != nil {
+			log.Trace("target ---> proxy server ---> proxy client: error:", err)
+		}
+	}()
+	err := utils.WriteTo(client, target, true, false)
+	if err != nil {
+		log.Trace("proxy client ---> proxy server ---> target: error:", err)
+	}
 }
