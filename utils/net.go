@@ -10,8 +10,8 @@ import (
 //make sure both client and target reader and writer close,and return when
 //stream is EOF
 func ProxyData(client io.ReadWriteCloser, target io.ReadWriteCloser) {
-	defer client.Close()
-	defer target.Close()
+	//defer client.Close()
+	//defer target.Close()
 	iseof := false
 	go func() {
 		var bf [1024 * 2]byte

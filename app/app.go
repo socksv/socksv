@@ -37,7 +37,7 @@ func NewClient(socks5Addr, proxyAddr string) *Client {
 	return c
 }
 
-//ProxyConnect is used in socks5
+//proxyConnect is used in socks5
 func (c *Client) proxyConnect(req *socks5.Request, inConn *net.TCPConn) error {
 	stream := sv.NewSocksVProtocol(req.Address(), req, inConn)
 	err := c.proxyClient.Open(stream)

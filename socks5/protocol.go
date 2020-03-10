@@ -325,8 +325,8 @@ type Reply struct {
 	BndPort []byte // 2 bytes
 }
 
-// NewReply return reply packet can be writed into client
-func NewReply(rep byte, atyp byte, bndaddr []byte, bndport []byte) *Reply {
+// newReply return reply packet can be writed into client
+func newReply(rep byte, atyp byte, bndaddr []byte, bndport []byte) *Reply {
 	if atyp == ATYPDomain {
 		bndaddr = append([]byte{byte(len(bndaddr))}, bndaddr...)
 	}
@@ -340,7 +340,7 @@ func NewReply(rep byte, atyp byte, bndaddr []byte, bndport []byte) *Reply {
 	}
 }
 
-func (p *Reply) Write(w io.Writer) error {
+func (p *Reply) write(w io.Writer) error {
 	if _, err := w.Write([]byte{p.Ver, p.Rep, p.Rsv, p.Atyp}); err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (p *Reply) Write(w io.Writer) error {
 	}
 	return nil
 }
-func (p *Reply) Read(reader io.Reader) error {
+func (p *Reply) read(reader io.Reader) error {
 	r := bufio.NewReader(reader)
 	if by, err := r.ReadByte(); err != nil {
 		return err
@@ -419,22 +419,39 @@ type Datagram struct {
 func ReplyError(req *Request, inConn *net.TCPConn, cmd byte) {
 	var rep *Reply
 	if req.Atyp == ATYPIPv4 || req.Atyp == ATYPDomain {
-		rep = NewReply(cmd, ATYPIPv4, []byte{0x00, 0x00, 0x00, 0x00}, []byte{0x00, 0x00})
+		rep = newReply(cmd, ATYPIPv4, []byte{0x00, 0x00, 0x00, 0x00}, []byte{0x00, 0x00})
 	} else {
-		rep = NewReply(cmd, ATYPIPv6, []byte(net.IPv6zero), []byte{0x00, 0x00})
+		rep = newReply(cmd, ATYPIPv6, []byte(net.IPv6zero), []byte{0x00, 0x00})
 	}
 	buf := bytes.NewBuffer(nil)
-	if err := rep.Write(buf); err != nil {
+	if err := rep.write(buf); err != nil {
 		logrus.Warn(err)
 	}
 	if _, err := inConn.Write(buf.Bytes()); err != nil {
 		logrus.Warn(err)
 	}
 }
+func ReplySuccess(req *Request, inConn *net.TCPConn, localAddr net.Addr) error {
+	a, addr, port, err := parseAddress(localAddr.String())
+	if err != nil {
+		ReplyError(req, inConn, RepHostUnreachable)
+		return err
+	}
+	successRep := newReply(RepSuccess, a, addr, port)
+	buf := bytes.NewBuffer(nil)
+	if err := successRep.write(buf); err != nil {
+		return err
+	}
+	if _, err := inConn.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	return nil
+}
 
-type Connect = func(req *Request, conn *net.TCPConn) error
+type connect = func(req *Request, conn *net.TCPConn) error
 
 func directConnect(req *Request, inConn *net.TCPConn) error {
+	defer inConn.Close()
 	logrus.Info("Dial:", req.Address())
 	tmp, err := net.Dial("tcp", req.Address())
 	if err != nil {
@@ -442,17 +459,8 @@ func directConnect(req *Request, inConn *net.TCPConn) error {
 		return err
 	}
 	outConn := tmp.(*net.TCPConn)
-	a, addr, port, err := ParseAddress(outConn.LocalAddr().String())
-	if err != nil {
-		ReplyError(req, inConn, RepHostUnreachable)
-		return err
-	}
-	successRep := NewReply(RepSuccess, a, addr, port)
-	buf := bytes.NewBuffer(nil)
-	if err := successRep.Write(buf); err != nil {
-		return err
-	}
-	if _, err := inConn.Write(buf.Bytes()); err != nil {
+	defer outConn.Close()
+	if err := ReplySuccess(req, inConn, outConn.LocalAddr()); err != nil {
 		return err
 	}
 	utils.ProxyData(inConn, outConn)

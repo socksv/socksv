@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-// ParseAddress format address x.x.x.x:xx to raw address.
+// parseAddress format address x.x.x.x:xx to raw address.
 // addr contains domain length
-func ParseAddress(address string) (a byte, addr []byte, port []byte, err error) {
+func parseAddress(address string) (a byte, addr []byte, port []byte, err error) {
 	var h, p string
 	h, p, err = net.SplitHostPort(address)
 	if err != nil {

@@ -1,7 +1,6 @@
 package sv
 
 import (
-	"bytes"
 	"errors"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -130,12 +129,14 @@ func (s *SocksVProtocol) ID() protocol.ProtocolID {
 	return protocol.SocksV
 }
 func (s *SocksVProtocol) In(rw io.ReadWriteCloser, session *smux.Session) error {
+	defer s.conn.Close()
+	defer rw.Close()
 	//write reply to socks5 client
-	if err := s.writeToSocks5(session); err != nil {
+	if err := socks5.ReplySuccess(s.req, s.conn, session.LocalAddr()); err != nil {
 		return err
 	}
-	//write request to proxy server
-	if err := writeRequest(rw, CmdConnect, []byte(s.Addr)); err != nil {
+	addr := s.req.Address()
+	if err := writeRequest(rw, CmdConnect, []byte(addr)); err != nil {
 		return err
 	}
 	var rep Reply
@@ -145,30 +146,15 @@ func (s *SocksVProtocol) In(rw io.ReadWriteCloser, session *smux.Session) error 
 	if rep.Status != StatusSuccess {
 		return errors.New("connect failed")
 	}
-	log.Info("accept: ", s.Addr)
+	log.Info("accept: ", addr)
 	//exchange data:socks5 client<--->proxy server
 	utils.ProxyData(s.conn, rw)
 	return nil
 }
-func (s *SocksVProtocol) writeToSocks5(session *smux.Session) error {
-	a, addr, port, err := socks5.ParseAddress(session.LocalAddr().String())
-	if err != nil {
-		socks5.ReplyError(s.req, s.conn, socks5.RepHostUnreachable)
-		return err
-	}
-	successRep := socks5.NewReply(socks5.RepSuccess, a, addr, port)
-	buf := bytes.NewBuffer(nil)
-	if err := successRep.Write(buf); err != nil {
-		return err
-	}
-	if _, err := s.conn.Write(buf.Bytes()); err != nil {
-		return err
-	}
-	return nil
-}
 
 func (s *SocksVProtocol) Out(rw io.ReadWriteCloser, session *smux.Session) error {
-	targetAddr, err := acceptConnect(rw)
+	defer rw.Close()
+	targetAddr, err := readRequest(rw)
 	if err != nil {
 		log.Warn(err)
 		return err
@@ -185,13 +171,13 @@ func dialTarget(rw io.ReadWriteCloser, targetAddr string) {
 	}
 	log.Info("dial:", targetAddr)
 	conn := tmp.(*net.TCPConn)
-
+	defer conn.Close()
 	_ = writeReply(rw, StatusSuccess, nil)
 	//exchange data:proxy server<--->target website
 	utils.ProxyData(rw, conn)
 }
 
-func acceptConnect(stream io.ReadWriteCloser) (string, error) {
+func readRequest(stream io.ReadWriteCloser) (string, error) {
 	var req Request
 	if err := req.Read(stream); err != nil {
 		return "", err
