@@ -24,32 +24,35 @@ connnected from inside.The network flow is:
 Run command `socksv -h` to get help:
 ```bash
 Usage of socksv:
+  -P string
+        proxy server port. (default "8080")
   -l int
         log level.0-info;1-debug;2-trace;3-warn;4-error. (default 1)
   -p string
-        server port. (default "1080")
+        socks5 server port. (default "1080")
   -s string
-        proxy server to connect.
-  -x string
-        target address to proxy.eg:https//www.google.com
+        relay server to connect.
 ```
 
 ### 1. run as server
 
 Runs as server on your proxy machine(like aws ec2) and listen at port 1081
 ```bash
-socksv -p 1081
+socksv -P 8080
 ```
 
 ### 2. run as client
 
 Runs as client on your local machine.
 
-The following command will run socksv as client,  connect to proxy server at [proxy_ip]:1081, and specify the target website url(e.g.,https//www.google.com).
+The following command will run socksv as client,  connect to proxy server at [proxy_ip]:8080, and listening socks5 stream at port 1080.
 
 ```bash
-socksv -s [proxy_ip]:1081 -x https//www.google.com
+socksv -s [proxy_ip]:8080
 ```
+
+> The communication between socksv proxy server and client is encrypted.
+
 ### 3.config chrome
 
 Config your chrome to connect to your local socks client.
@@ -57,7 +60,7 @@ Config your chrome to connect to your local socks client.
 Here you need a chrome plugin  [SwitchyOmega](https://chrome.google.com/webstore/detail/proxy-switchyomega/padekgcemlokbadohgkifijomclgjgif?utm_source=chrome-ntp-icon)  and config the proxy as:
 * `protocol`: socks5
 * `proxy server`: 127.0.0.1 (the socksv client running in your local machine)
-* `port`: 1081
+* `port`: 1080
 
 > After the 3 steps configuration, your can visit whatever you want
 
@@ -66,7 +69,6 @@ Here you need a chrome plugin  [SwitchyOmega](https://chrome.google.com/webstore
 `TODO` List:
 
  * udp support for socks5
- * communicate between socksv
  * chrome plugin client
  * ios client
  * android client
@@ -74,7 +76,9 @@ Here you need a chrome plugin  [SwitchyOmega](https://chrome.google.com/webstore
 
 ## Contributing
 
- If you are interested in this project and wanna contribute, please fork this,
+ If you are interested in this project and wanna contribute, please fork this project,
   modify, and submit a pull request.
 
- You are welcome to submit issues to help improve the code and experience.You can choose what to do in the `TODO` list.
+ You are welcome to submit issues to help improve the code and experience.
+
+ You can choose what to do in the `TODO` list.
